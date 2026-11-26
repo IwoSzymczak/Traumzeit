@@ -1,2 +1,878 @@
-# Traumzeit
-Surrealism Tap Game
+name: Traumzeit APK bauen
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+      - name: Projektdateien erzeugen
+        run: |
+          cat > settings.gradle.kts <<'TRAUM_EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "Traumzeit"
+          include(":app")
+          TRAUM_EOF
+          cat > build.gradle.kts <<'TRAUM_EOF'
+          plugins {
+              id("com.android.application") version "8.7.3" apply false
+              id("org.jetbrains.kotlin.android") version "2.0.21" apply false
+          }
+          TRAUM_EOF
+          cat > gradle.properties <<'TRAUM_EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          kotlin.code.style=official
+          android.nonTransitiveRClass=true
+          TRAUM_EOF
+          mkdir -p app
+          cat > app/build.gradle.kts <<'TRAUM_EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+
+          android {
+              namespace = "com.traumzeit.game"
+              compileSdk = 35
+
+              defaultConfig {
+                  applicationId = "com.traumzeit.game"
+                  minSdk = 24
+                  targetSdk = 35
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+          }
+          TRAUM_EOF
+          mkdir -p app/src/main
+          cat > app/src/main/AndroidManifest.xml <<'TRAUM_EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="Traumzeit"
+                  android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:screenOrientation="portrait"
+                      android:configChanges="orientation|screenSize|keyboardHidden">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          TRAUM_EOF
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_launcher.xml <<'TRAUM_EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <!-- Ein schwebendes Auge vor einer Dämmerungssonne -->
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path android:fillColor="#3B2D5C" android:pathData="M0,0h108v108h-108z" />
+              <path android:fillColor="#E8946A" android:pathData="M0,62h108v46h-108z" />
+              <path android:fillColor="#FFF1D6" android:pathData="M54,54m-30,0a30,30 0,1 1,60 0a30,30 0,1 1,-60 0" />
+              <path android:fillColor="#FFF8EC" android:strokeColor="#2A1A2E" android:strokeWidth="2.5"
+                  android:pathData="M24,54 Q54,30 84,54 Q54,78 24,54 Z" />
+              <path android:fillColor="#1F8A99" android:pathData="M54,54m-11,0a11,11 0,1 1,22 0a11,11 0,1 1,-22 0" />
+              <path android:fillColor="#120A14" android:pathData="M54,54m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
+              <path android:fillColor="#FFFFFF" android:pathData="M58,50m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+          </vector>
+          TRAUM_EOF
+          mkdir -p app/src/main/java/com/traumzeit/game
+          cat > app/src/main/java/com/traumzeit/game/MainActivity.kt <<'TRAUM_EOF'
+          package com.traumzeit.game
+
+          import android.app.Activity
+          import android.os.Build
+          import android.os.Bundle
+          import android.view.View
+          import android.view.WindowInsets
+          import android.view.WindowInsetsController
+          import android.view.WindowManager
+
+          class MainActivity : Activity() {
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                  setContentView(GameView(this))
+                  hideSystemBars()
+              }
+
+              override fun onWindowFocusChanged(hasFocus: Boolean) {
+                  super.onWindowFocusChanged(hasFocus)
+                  if (hasFocus) hideSystemBars()
+              }
+
+              @Suppress("DEPRECATION")
+              private fun hideSystemBars() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                      window.setDecorFitsSystemWindows(false)
+                      val controller = window.insetsController
+                      if (controller != null) {
+                          controller.hide(WindowInsets.Type.systemBars())
+                          controller.systemBarsBehavior =
+                              WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                      }
+                  } else {
+                      window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                              or View.SYSTEM_UI_FLAG_FULLSCREEN
+                              or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                              or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                              or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                              or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)
+                  }
+              }
+          }
+          TRAUM_EOF
+          mkdir -p app/src/main/java/com/traumzeit/game
+          cat > app/src/main/java/com/traumzeit/game/GameView.kt <<'TRAUM_EOF'
+          package com.traumzeit.game
+
+          import android.content.Context
+          import android.graphics.Canvas
+          import android.graphics.Color
+          import android.graphics.LinearGradient
+          import android.graphics.Paint
+          import android.graphics.Path
+          import android.graphics.RadialGradient
+          import android.graphics.Shader
+          import android.graphics.Typeface
+          import android.view.MotionEvent
+          import android.view.View
+          import kotlin.math.abs
+          import kotlin.math.cos
+          import kotlin.math.floor
+          import kotlin.math.hypot
+          import kotlin.math.max
+          import kotlin.math.min
+          import kotlin.math.sin
+          import kotlin.random.Random
+
+          /**
+           * TRAUMZEIT – ein schwebendes Auge gleitet durch eine surreale Dämmerwüste.
+           * Finger halten = aufsteigen, loslassen = sinken. Weiche den schmelzenden Uhren aus.
+           */
+          class GameView(context: Context) : View(context) {
+
+              private enum class State { MENU, PLAYING, OVER }
+
+              private var state = State.MENU
+
+              private val prefs = context.getSharedPreferences("traumzeit", Context.MODE_PRIVATE)
+              private var best = prefs.getInt("best", 0)
+
+              // Bildschirmmaße
+              private var w = 1f
+              private var h = 1f
+              private var u = 1f          // min(w, h) – Grundeinheit
+              private var horizon = 1f
+              private var eyeR = 1f
+
+              // Spieler (das Auge)
+              private var py = 0f
+              private var vy = 0f
+              private var holding = false
+              private var blinkT = 0f
+              private var nextBlink = 2.5f
+
+              // Welt
+              private var time = 0f
+              private var dist = 0f
+              private var score = 0
+              private var spawnTimer = 0f
+              private var overTimer = 0f
+              private var flash = 0f
+              private var lastNanos = 0L
+              private var newBest = false
+
+              private class Clock(
+                  var x: Float, val y: Float, val r: Float,
+                  val phase: Float, val bob: Float, val depth: Float, val spin: Float
+              ) {
+                  var passed = false
+                  var cy = y
+              }
+
+              private class Stone(var x: Float, val y: Float, val r: Float, val par: Float, val path: Path, val tree: Boolean)
+              private class Cloud(var x: Float, val y: Float, val s: Float, val par: Float)
+              private class Particle(
+                  var x: Float, var y: Float, val vx: Float, val vy: Float,
+                  var life: Float, val maxLife: Float, val size: Float, val color: Int
+              )
+
+              private val clocks = ArrayList<Clock>()
+              private val stones = ArrayList<Stone>()
+              private val clouds = ArrayList<Cloud>()
+              private val particles = ArrayList<Particle>()
+
+              // Paints
+              private val skyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val floorPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(120, 70, 30, 40) }
+              private val hazePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val sunPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(255, 241, 214) }
+              private val sunGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+              private val moonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(250, 236, 210) }
+              private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 40, 10, 30) }
+              private val stonePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(122, 78, 94) }
+              private val stoneTopPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(196, 140, 132) }
+              private val treePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(38, 58, 52) }
+              private val cloudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(120, 255, 248, 240) }
+              private val ladderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                  color = Color.rgb(58, 36, 24); style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND
+              }
+              private val facePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(242, 227, 191) }
+              private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                  color = Color.rgb(200, 160, 74); style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND
+              }
+              private val inkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                  color = Color.rgb(59, 42, 32); style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND
+              }
+              private val goldFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(200, 160, 74) }
+              private val scleraPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(255, 248, 236) }
+              private val lidPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                  color = Color.rgb(42, 26, 46); style = Paint.Style.STROKE
+                  strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+              }
+              private val irisPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val pupilPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(18, 10, 20) }
+              private val glintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+              private val eyeGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val wingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(210, 255, 250, 240) }
+              private val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val vignettePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val flashPaint = Paint()
+              private val dimPaint = Paint().apply { color = Color.argb(110, 20, 10, 30) }
+
+              private val serif = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
+              private val serifItalic = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
+
+              private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                  color = Color.rgb(255, 244, 222); textAlign = Paint.Align.CENTER; typeface = serif
+                  letterSpacing = 0.22f
+                  setShadowLayer(18f, 0f, 6f, Color.argb(140, 40, 10, 40))
+              }
+              private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                  color = Color.rgb(255, 244, 222); textAlign = Paint.Align.CENTER; typeface = serifItalic
+                  setShadowLayer(10f, 0f, 3f, Color.argb(140, 40, 10, 40))
+              }
+              private val scorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                  color = Color.argb(215, 255, 244, 222); textAlign = Paint.Align.CENTER; typeface = serif
+                  setShadowLayer(14f, 0f, 5f, Color.argb(120, 40, 10, 40))
+              }
+
+              private val tmp = Path()
+              private val tiles = Path()
+
+              // ---------------------------------------------------------------- Setup
+
+              override fun onSizeChanged(nw: Int, nh: Int, ow: Int, oh: Int) {
+                  super.onSizeChanged(nw, nh, ow, oh)
+                  w = nw.toFloat()
+                  h = nh.toFloat()
+                  u = min(w, h)
+                  horizon = h * 0.68f
+                  eyeR = u * 0.065f
+
+                  skyPaint.shader = LinearGradient(
+                      0f, 0f, 0f, horizon,
+                      intArrayOf(
+                          Color.rgb(27, 32, 74), Color.rgb(94, 72, 140),
+                          Color.rgb(222, 128, 120), Color.rgb(246, 205, 150)
+                      ),
+                      floatArrayOf(0f, 0.42f, 0.78f, 1f), Shader.TileMode.CLAMP
+                  )
+                  floorPaint.shader = LinearGradient(
+                      0f, horizon, 0f, h,
+                      intArrayOf(Color.rgb(226, 160, 108), Color.rgb(176, 98, 78), Color.rgb(92, 44, 52)),
+                      floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP
+                  )
+                  hazePaint.shader = LinearGradient(
+                      0f, horizon - h * 0.04f, 0f, horizon + (h - horizon) * 0.3f,
+                      intArrayOf(Color.argb(0, 246, 205, 150), Color.argb(255, 246, 205, 150), Color.argb(0, 246, 205, 150)),
+                      floatArrayOf(0f, 0.18f, 1f), Shader.TileMode.CLAMP
+                  )
+                  val sx = w * 0.7f
+                  val sy = horizon - h * 0.2f
+                  sunGlowPaint.shader = RadialGradient(
+                      sx, sy, u * 0.6f,
+                      intArrayOf(Color.argb(160, 255, 236, 200), Color.argb(0, 255, 200, 160)),
+                      null, Shader.TileMode.CLAMP
+                  )
+                  vignettePaint.shader = RadialGradient(
+                      w / 2f, h / 2f, max(w, h) * 0.75f,
+                      intArrayOf(Color.argb(0, 30, 10, 30), Color.argb(0, 30, 10, 30), Color.argb(170, 30, 10, 30)),
+                      floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP
+                  )
+                  eyeGlowPaint.shader = RadialGradient(
+                      0f, 0f, eyeR * 2.6f,
+                      intArrayOf(Color.argb(120, 255, 233, 176), Color.argb(0, 255, 233, 176)),
+                      null, Shader.TileMode.CLAMP
+                  )
+                  irisPaint.shader = RadialGradient(
+                      0f, 0f, eyeR * 0.65f,
+                      intArrayOf(Color.rgb(120, 230, 210), Color.rgb(46, 160, 170), Color.rgb(11, 60, 90)),
+                      floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP
+                  )
+
+                  ringPaint.strokeWidth = u * 0.004f
+                  ladderPaint.strokeWidth = u * 0.009f
+                  titlePaint.textSize = u * 0.13f
+                  textPaint.textSize = u * 0.05f
+                  scorePaint.textSize = u * 0.17f
+
+                  stones.clear()
+                  for (i in 0 until 4) stones.add(makeStone(Random.nextFloat() * w * 1.4f))
+                  clouds.clear()
+                  for (i in 0 until 5) {
+                      clouds.add(Cloud(Random.nextFloat() * w * 1.3f, h * (0.06f + Random.nextFloat() * 0.38f),
+                          u * (0.12f + Random.nextFloat() * 0.14f), 0.05f + Random.nextFloat() * 0.08f))
+                  }
+                  if (state != State.PLAYING) py = h * 0.45f
+              }
+
+              private fun makeStone(x: Float): Stone {
+                  val r = u * (0.05f + Random.nextFloat() * 0.09f)
+                  val p = Path()
+                  p.moveTo(-r, 0f)
+                  p.quadTo(0f, -r * 0.32f, r, 0f)
+                  val n = 5
+                  for (i in 1..n) {
+                      val t = i.toFloat() / (n + 1)
+                      val xx = r - 2f * r * t
+                      val depth = (1f - abs(t - 0.5f) * 2f) * r * (0.9f + Random.nextFloat() * 0.8f)
+                      p.lineTo(xx + (Random.nextFloat() - 0.5f) * r * 0.25f, depth + r * 0.15f)
+                  }
+                  p.close()
+                  return Stone(
+                      x, h * (0.12f + Random.nextFloat() * 0.42f), r,
+                      0.12f + Random.nextFloat() * 0.18f, p, Random.nextFloat() < 0.5f
+                  )
+              }
+
+              // ---------------------------------------------------------------- Spiel-Logik
+
+              private fun speed(): Float = w * (0.42f + min(score, 60) * 0.008f)
+
+              private fun startGame() {
+                  clocks.clear()
+                  score = 0
+                  py = h * 0.45f
+                  vy = 0f
+                  spawnTimer = 0.9f
+                  newBest = false
+                  state = State.PLAYING
+              }
+
+              private fun die() {
+                  state = State.OVER
+                  overTimer = 0f
+                  flash = 1f
+                  vy = -h * 0.25f
+                  holding = false
+                  if (score > best) {
+                      best = score
+                      newBest = true
+                      prefs.edit().putInt("best", best).apply()
+                  }
+                  for (i in 0 until 26) {
+                      val a = Random.nextFloat() * 6.283f
+                      val s = u * (0.2f + Random.nextFloat() * 0.6f)
+                      particles.add(Particle(w * 0.28f, py, cos(a) * s, sin(a) * s, 1.1f, 1.1f,
+                          u * (0.006f + Random.nextFloat() * 0.01f), Color.rgb(255, 230, 170)))
+                  }
+              }
+
+              private fun spawnClock() {
+                  val pair = score > 4 && Random.nextFloat() < 0.35f
+                  if (pair) {
+                      val gap = h * 0.3f
+                      val center = h * (0.3f + Random.nextFloat() * 0.4f)
+                      addClock(center - gap / 2f - u * 0.1f)
+                      addClock(center + gap / 2f + u * 0.1f)
+                  } else {
+                      addClock(h * (0.1f + Random.nextFloat() * 0.8f))
+                  }
+              }
+
+              private fun addClock(y: Float) {
+                  val r = u * (0.075f + Random.nextFloat() * 0.06f)
+                  clocks.add(Clock(
+                      w + r * 2f, y, r, Random.nextFloat() * 6.283f,
+                      u * (0.01f + Random.nextFloat() * 0.03f), Random.nextFloat(),
+                      0.4f + Random.nextFloat() * 1.6f
+                  ))
+              }
+
+              private fun update(dt: Float) {
+                  time += dt
+                  flash = max(0f, flash - dt * 2.5f)
+                  val sp = speed()
+                  val px = w * 0.28f
+
+                  when (state) {
+                      State.MENU -> {
+                          dist += sp * 0.5f * dt
+                          py = h * 0.47f + sin(time * 1.6f) * u * 0.04f
+                          vy = cos(time * 1.6f) * h * 0.06f
+                      }
+                      State.PLAYING -> {
+                          dist += sp * dt
+                          val g = h * 1.7f
+                          val lift = h * 3.6f
+                          vy += (if (holding) g - lift else g) * dt
+                          vy = max(-h * 0.85f, min(h * 0.95f, vy))
+                          py += vy * dt
+
+                          spawnTimer -= dt
+                          if (spawnTimer <= 0f) {
+                              spawnClock()
+                              spawnTimer = max(0.8f, 1.55f - score * 0.02f)
+                          }
+
+                          val it = clocks.iterator()
+                          while (it.hasNext()) {
+                              val k = it.next()
+                              k.x -= sp * dt
+                              k.cy = k.y + sin(time * 1.3f + k.phase) * k.bob
+                              if (!k.passed && k.x + k.r < px) {
+                                  k.passed = true
+                                  score++
+                              }
+                              if (k.x < -k.r * 3f) it.remove()
+                          }
+
+                          if (Random.nextFloat() < dt * 40f) {
+                              particles.add(Particle(px - eyeR * 1.1f, py + (Random.nextFloat() - 0.5f) * eyeR,
+                                  -sp * 0.25f, (Random.nextFloat() - 0.5f) * u * 0.05f, 0.7f, 0.7f,
+                                  u * (0.004f + Random.nextFloat() * 0.007f), Color.rgb(255, 226, 160)))
+                          }
+
+                          if (py - eyeR * 0.7f < 0f || py + eyeR * 0.7f > h) {
+                              die()
+                          } else {
+                              for (k in clocks) {
+                                  if (hypot(k.x - px, k.cy - py) < k.r * 0.92f + eyeR * 0.75f) {
+                                      die(); break
+                                  }
+                              }
+                          }
+                      }
+                      State.OVER -> {
+                          overTimer += dt
+                          vy += h * 1.4f * dt
+                          py = min(py + vy * dt, h + eyeR * 4f)
+                          for (k in clocks) k.cy = k.y + sin(time * 1.3f + k.phase) * k.bob
+                      }
+                  }
+
+                  // Hintergrund driftet immer, nur langsamer nach dem Aufwachen
+                  val bgSpeed = if (state == State.OVER) sp * 0.15f else if (state == State.MENU) sp * 0.5f else sp
+                  for (s in stones) {
+                      s.x -= bgSpeed * s.par * dt
+                      if (s.x < -s.r * 2f) {
+                          val idx = stones.indexOf(s)
+                          stones[idx] = makeStone(w + s.r * 2f + Random.nextFloat() * w * 0.6f)
+                      }
+                  }
+                  for (c in clouds) {
+                      c.x -= (bgSpeed * c.par + u * 0.01f) * dt
+                      if (c.x < -c.s * 3f) c.x = w + c.s * 3f
+                  }
+
+                  val pit = particles.iterator()
+                  while (pit.hasNext()) {
+                      val p = pit.next()
+                      p.life -= dt
+                      p.x += p.vx * dt
+                      p.y += p.vy * dt
+                      if (p.life <= 0f) pit.remove()
+                  }
+
+                  nextBlink -= dt
+                  if (nextBlink <= 0f) {
+                      blinkT = 0.2f
+                      nextBlink = 2f + Random.nextFloat() * 3.5f
+                  }
+                  blinkT = max(0f, blinkT - dt)
+              }
+
+              // ---------------------------------------------------------------- Zeichnen
+
+              override fun onDraw(canvas: Canvas) {
+                  super.onDraw(canvas)
+                  val now = System.nanoTime()
+                  val dt = if (lastNanos == 0L) 0f else min((now - lastNanos) / 1_000_000_000f, 0.033f)
+                  lastNanos = now
+                  update(dt)
+
+                  drawSky(canvas)
+                  drawFloor(canvas)
+                  drawLadder(canvas)
+                  for (s in stones) drawStone(canvas, s)
+                  for (k in clocks) drawClockShadow(canvas, k)
+                  for (k in clocks) drawClock(canvas, k)
+                  drawParticles(canvas)
+                  drawEye(canvas, w * 0.28f, py)
+                  canvas.drawRect(0f, 0f, w, h, vignettePaint)
+                  drawHud(canvas)
+
+                  if (flash > 0f) {
+                      flashPaint.color = Color.argb((flash * 200).toInt(), 255, 245, 225)
+                      canvas.drawRect(0f, 0f, w, h, flashPaint)
+                  }
+                  postInvalidateOnAnimation()
+              }
+
+              private fun drawSky(c: Canvas) {
+                  c.drawRect(0f, 0f, w, horizon + 2f, skyPaint)
+
+                  // Zweite "Sonne": eine Sichel, ausgeschnitten mit dem Himmelsverlauf selbst
+                  val mx = w * 0.2f
+                  val my = h * 0.11f
+                  val mr = u * 0.055f
+                  c.drawCircle(mx, my, mr, moonPaint)
+                  c.drawCircle(mx + mr * 0.42f, my - mr * 0.2f, mr * 0.9f, skyPaint)
+
+                  // Sterne, die nur oben im Dunkel funkeln
+                  for (i in 0 until 22) {
+                      val sx = ((i * 0.618034f + 0.1f) % 1f) * w
+                      val sy = ((i * 0.754878f + 0.05f) % 1f) * h * 0.32f
+                      val tw = 0.5f + 0.5f * sin(time * 2f + i)
+                      particlePaint.color = Color.argb((tw * 150).toInt(), 255, 246, 230)
+                      c.drawCircle(sx, sy, u * 0.003f * (1f + tw), particlePaint)
+                  }
+
+                  val sx = w * 0.7f
+                  val sy = horizon - h * 0.2f
+                  c.drawCircle(sx, sy, u * 0.6f, sunGlowPaint)
+                  c.drawCircle(sx, sy, u * 0.2f, sunPaint)
+                  for (i in 1..3) {
+                      val rr = u * (0.2f + i * 0.055f) + sin(time * 0.8f + i) * u * 0.006f
+                      ringPaint.color = Color.argb(90 - i * 22, 255, 241, 214)
+                      c.drawCircle(sx, sy, rr, ringPaint)
+                  }
+
+                  for (cl in clouds) {
+                      c.drawOval(cl.x - cl.s, cl.y - cl.s * 0.16f, cl.x + cl.s, cl.y + cl.s * 0.16f, cloudPaint)
+                      c.drawOval(cl.x - cl.s * 0.5f, cl.y - cl.s * 0.3f, cl.x + cl.s * 0.4f, cl.y + cl.s * 0.05f, cloudPaint)
+                      c.drawOval(cl.x + cl.s * 0.2f, cl.y - cl.s * 0.22f, cl.x + cl.s * 0.8f, cl.y + cl.s * 0.08f, cloudPaint)
+                  }
+              }
+
+              /** Perspektivisches Schachbrett, das bis zum Horizont fließt. */
+              private fun drawFloor(c: Canvas) {
+                  c.drawRect(0f, horizon, w, h, floorPaint)
+                  val fh = h - horizon
+                  val cx = w / 2f
+                  val f = fh                // Brennweite bei Kamerahöhe 1
+                  val d = 0.38f             // Kachelgröße in Weltkoordinaten
+                  val camX = dist / fh * 0.6f
+                  tiles.reset()
+                  val rows = 26
+                  for (k in 0 until rows) {
+                      val z0 = 1f + k * d
+                      val z1 = z0 + d
+                      val y0 = horizon + f / z0
+                      val y1 = horizon + f / z1
+                      val halfWorld = cx * z1 / f
+                      val c0 = floor((camX - halfWorld) / d).toInt()
+                      val c1 = floor((camX + halfWorld) / d).toInt() + 1
+                      for (col in c0..c1) {
+                          if (((col + k) and 1) != 0) continue
+                          val xa = col * d - camX
+                          val xb = xa + d
+                          tiles.moveTo(cx + xa * f / z0, y0)
+                          tiles.lineTo(cx + xb * f / z0, y0)
+                          tiles.lineTo(cx + xb * f / z1, y1)
+                          tiles.lineTo(cx + xa * f / z1, y1)
+                          tiles.close()
+                      }
+                  }
+                  c.drawPath(tiles, tilePaint)
+                  c.drawRect(0f, horizon - h * 0.04f, w, horizon + fh * 0.3f, hazePaint)
+              }
+
+              /** Eine einsame Leiter, die im Nichts endet. */
+              private fun drawLadder(c: Canvas) {
+                  val period = w * 1.9f
+                  val lx = w * 1.25f - ((dist * 0.3f) % period)
+                  val baseY = horizon + (h - horizon) * 0.18f
+                  val half = u * 0.03f
+                  // langer Schatten
+                  tmp.reset()
+                  tmp.moveTo(lx - half, baseY)
+                  tmp.lineTo(lx + half, baseY)
+                  tmp.lineTo(lx - u * 0.55f, baseY + u * 0.05f)
+                  tmp.lineTo(lx - u * 0.62f, baseY + u * 0.04f)
+                  tmp.close()
+                  c.drawPath(tmp, shadowPaint)
+                  val topY = h * 0.08f
+                  c.drawLine(lx - half, baseY, lx - half * 0.7f, topY, ladderPaint)
+                  c.drawLine(lx + half, baseY, lx + half * 0.7f, topY, ladderPaint)
+                  var y = baseY - u * 0.03f
+                  while (y > topY + u * 0.02f) {
+                      val t = (baseY - y) / (baseY - topY)
+                      val hw = half * (1f - 0.3f * t)
+                      c.drawLine(lx - hw, y, lx + hw, y, ladderPaint)
+                      y -= u * 0.045f
+                  }
+              }
+
+              private fun drawStone(c: Canvas, s: Stone) {
+                  val bob = sin(time * 0.9f + s.r) * u * 0.008f
+                  // Schatten am Boden – weit entfernt, als hinge der Fels über der Wüste
+                  val gy = horizon + (h - horizon) * (0.06f + s.par * 0.6f)
+                  c.drawOval(s.x - s.r * 2.2f, gy - s.r * 0.12f, s.x + s.r * 0.6f, gy + s.r * 0.12f, shadowPaint)
+
+                  c.save()
+                  c.translate(s.x, s.y + bob)
+                  c.drawPath(s.path, stonePaint)
+                  c.drawOval(-s.r, -s.r * 0.17f, s.r, s.r * 0.17f, stoneTopPaint)
+                  if (s.tree) {
+                      c.drawOval(-s.r * 0.12f, -s.r * 0.95f, s.r * 0.12f, -s.r * 0.05f, treePaint)
+                  }
+                  c.restore()
+              }
+
+              private fun drawClockShadow(c: Canvas, k: Clock) {
+                  val gy = horizon + (h - horizon) * (0.25f + k.depth * 0.55f)
+                  val sx = k.x - k.r * 1.3f
+                  c.drawOval(sx - k.r * 1.8f, gy - k.r * 0.16f, sx + k.r * 1.2f, gy + k.r * 0.16f, shadowPaint)
+              }
+
+              /** Dalí-artige schmelzende Taschenuhr mit rückwärts laufenden Zeigern. */
+              private fun drawClock(c: Canvas, k: Clock) {
+                  val r = k.r
+                  val drip = 1f + 0.22f * sin(time * 2f + k.phase)
+                  c.save()
+                  c.translate(k.x, k.cy)
+                  c.rotate(sin(time * 0.7f + k.phase) * 9f)
+
+                  val p = tmp
+                  p.reset()
+                  p.moveTo(-r, 0f)
+                  p.cubicTo(-r, -r * 1.33f, r, -r * 1.33f, r, 0f)
+                  p.cubicTo(r, r * 0.5f, r * 0.75f, r * 0.8f, r * 0.55f, r * 0.95f)
+                  p.cubicTo(r * 0.45f, r * 1.05f, r * 0.52f, r * 1.6f * drip, r * 0.36f, r * 1.75f * drip)
+                  p.cubicTo(r * 0.22f, r * 1.88f * drip, r * 0.1f, r * 1.5f * drip, r * 0.12f, r * 1.05f)
+                  p.cubicTo(r * 0.02f, r * 1.0f, -r * 0.2f, r * 1.05f, -r * 0.3f, r * 1.08f)
+                  p.cubicTo(-r * 0.36f, r * 1.22f * drip, -r * 0.5f, r * 1.32f * drip, -r * 0.56f, r * 1.12f)
+                  p.cubicTo(-r * 0.85f, r * 0.85f, -r, r * 0.45f, -r, 0f)
+                  p.close()
+
+                  // Krone der Taschenuhr
+                  c.drawCircle(0f, -r * 1.08f, r * 0.11f, goldFill)
+                  c.drawRect(-r * 0.06f, -r * 1.05f, r * 0.06f, -r * 0.94f, goldFill)
+
+                  c.drawPath(p, facePaint)
+                  rimPaint.strokeWidth = r * 0.1f
+                  c.drawPath(p, rimPaint)
+
+                  inkPaint.strokeWidth = r * 0.045f
+                  for (i in 0 until 12) {
+                      val a = i * 0.5236f
+                      val ca = cos(a)
+                      val sa = sin(a)
+                      val stretch = if (sa > 0f) 1.18f else 1f
+                      val r0 = if (i % 3 == 0) 0.64f else 0.72f
+                      c.drawLine(ca * r * r0, sa * r * r0 * stretch, ca * r * 0.82f, sa * r * 0.82f * stretch, inkPaint)
+                  }
+                  val minute = -time * k.spin * 2.2f + k.phase
+                  val hour = minute / 12f
+                  inkPaint.strokeWidth = r * 0.07f
+                  c.drawLine(0f, 0f, sin(hour) * r * 0.4f, -cos(hour) * r * 0.4f, inkPaint)
+                  inkPaint.strokeWidth = r * 0.045f
+                  val my = -cos(minute) * r * 0.66f
+                  c.drawLine(0f, 0f, sin(minute) * r * 0.66f, if (my > 0f) my * 1.18f else my, inkPaint)
+                  c.drawCircle(0f, 0f, r * 0.07f, goldFill)
+                  c.restore()
+              }
+
+              private fun drawParticles(c: Canvas) {
+                  for (p in particles) {
+                      val a = (p.life / p.maxLife).coerceIn(0f, 1f)
+                      particlePaint.color = Color.argb((a * 200).toInt(), Color.red(p.color), Color.green(p.color), Color.blue(p.color))
+                      c.drawCircle(p.x, p.y, p.size * (0.4f + a), particlePaint)
+                  }
+              }
+
+              private fun drawEye(c: Canvas, x: Float, y: Float) {
+                  val r = eyeR
+                  var open = if (blinkT > 0f) abs(blinkT / 0.2f * 2f - 1f) else 1f
+                  if (state == State.OVER) open = min(open, max(0f, 1f - overTimer * 2.5f))
+                  val tilt = (vy / h * 45f).coerceIn(-25f, 25f)
+
+                  c.save()
+                  c.translate(x, y)
+                  c.drawCircle(0f, 0f, r * 2.6f, eyeGlowPaint)
+                  c.rotate(tilt)
+
+                  // Flügel
+                  val flapSpeed = if (holding) 16f else 5f
+                  val flap = sin(time * flapSpeed) * r * 0.3f
+                  for (side in 0..1) {
+                      val dir = if (side == 0) -1f else 1f
+                      tmp.reset()
+                      tmp.moveTo(-r * 0.3f, -r * 0.35f * dir)
+                      tmp.quadTo(-r * 0.9f, (-r * 1.5f - flap) * dir, -r * 1.9f, (-r * 1.0f - flap) * dir)
+                      tmp.quadTo(-r * 1.4f, -r * 0.9f * dir, -r * 1.9f, -r * 0.55f * dir)
+                      tmp.quadTo(-r * 1.1f, -r * 0.45f * dir, -r * 0.4f, -r * 0.15f * dir)
+                      tmp.close()
+                      wingPaint.alpha = if (side == 0) 220 else 150
+                      c.drawPath(tmp, wingPaint)
+                  }
+
+                  val lidH = r * 1.25f * max(open, 0.04f)
+                  tmp.reset()
+                  tmp.moveTo(-r * 1.35f, 0f)
+                  tmp.quadTo(0f, -lidH * 1.25f, r * 1.35f, 0f)
+                  tmp.quadTo(0f, lidH * 1.25f, -r * 1.35f, 0f)
+                  tmp.close()
+                  c.drawPath(tmp, scleraPaint)
+
+                  c.save()
+                  c.clipPath(tmp)
+                  val lookY = (vy / h * r * 1.2f).coerceIn(-r * 0.35f, r * 0.35f)
+                  c.translate(r * 0.15f, lookY)
+                  c.drawCircle(0f, 0f, r * 0.65f, irisPaint)
+                  c.drawCircle(0f, 0f, r * (0.26f + 0.04f * sin(time * 3f)), pupilPaint)
+                  c.drawCircle(r * 0.2f, -r * 0.22f, r * 0.11f, glintPaint)
+                  c.restore()
+
+                  lidPaint.strokeWidth = r * 0.1f
+                  c.drawPath(tmp, lidPaint)
+                  // Wimpern
+                  lidPaint.strokeWidth = r * 0.07f
+                  for (i in -2..2) {
+                      val t = i / 2.6f
+                      val bx = t * r * 1.1f
+                      val by = -lidH * (1f - t * t) * 0.62f
+                      c.drawLine(bx, by, bx * 1.25f, by - r * 0.38f * max(open, 0.3f), lidPaint)
+                  }
+                  c.restore()
+              }
+
+              private fun drawHud(c: Canvas) {
+                  when (state) {
+                      State.MENU -> {
+                          c.drawRect(0f, 0f, w, h, dimPaint)
+                          c.drawText("TRAUMZEIT", w / 2f, h * 0.2f, titlePaint)
+                          c.drawText("ein Auge, das nicht aufwachen will", w / 2f, h * 0.2f + u * 0.09f, textPaint)
+                          val pulse = 0.55f + 0.45f * sin(time * 2.6f)
+                          textPaint.alpha = (pulse * 255).toInt()
+                          c.drawText("Tippe, um zu träumen", w / 2f, h * 0.72f, textPaint)
+                          textPaint.alpha = 200
+                          c.drawText("Halten: schweben  ·  Loslassen: sinken", w / 2f, h * 0.72f + u * 0.085f, textPaint.apply { textSize = u * 0.042f })
+                          c.drawText("Meide die schmelzenden Uhren", w / 2f, h * 0.72f + u * 0.15f, textPaint)
+                          textPaint.textSize = u * 0.05f
+                          if (best > 0) c.drawText("Längster Traum: $best", w / 2f, h * 0.9f, textPaint)
+                          textPaint.alpha = 255
+                      }
+                      State.PLAYING -> {
+                          c.drawText(score.toString(), w / 2f, h * 0.14f, scorePaint)
+                      }
+                      State.OVER -> {
+                          val a = min(1f, overTimer * 1.5f)
+                          dimPaint.alpha = (a * 110).toInt()
+                          c.drawRect(0f, 0f, w, h, dimPaint)
+                          dimPaint.alpha = 110
+                          titlePaint.alpha = (a * 255).toInt()
+                          textPaint.alpha = (a * 255).toInt()
+                          scorePaint.alpha = (a * 215).toInt()
+                          c.drawText("Du bist aufgewacht.", w / 2f, h * 0.3f, textPaint.apply { textSize = u * 0.075f })
+                          textPaint.textSize = u * 0.05f
+                          c.drawText(score.toString(), w / 2f, h * 0.45f, scorePaint)
+                          c.drawText(if (newBest) "Neuer längster Traum!" else "Längster Traum: $best", w / 2f, h * 0.52f, textPaint)
+                          if (overTimer > 0.7f) {
+                              val pulse = 0.55f + 0.45f * sin(time * 2.6f)
+                              textPaint.alpha = (pulse * 255 * a).toInt()
+                              c.drawText("Tippe, um weiterzuträumen", w / 2f, h * 0.68f, textPaint)
+                          }
+                          titlePaint.alpha = 255
+                          textPaint.alpha = 255
+                          scorePaint.alpha = 215
+                      }
+                  }
+              }
+
+              // ---------------------------------------------------------------- Eingabe
+
+              override fun onTouchEvent(event: MotionEvent): Boolean {
+                  when (event.actionMasked) {
+                      MotionEvent.ACTION_DOWN -> {
+                          when (state) {
+                              State.MENU -> { startGame(); holding = true }
+                              State.PLAYING -> holding = true
+                              State.OVER -> if (overTimer > 0.7f) { startGame(); holding = true }
+                          }
+                      }
+                      MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                          holding = false
+                          if (event.actionMasked == MotionEvent.ACTION_UP) performClick()
+                      }
+                  }
+                  return true
+              }
+
+              override fun performClick(): Boolean {
+                  super.performClick()
+                  return true
+              }
+          }
+          TRAUM_EOF
+      - name: APK bauen
+        run: gradle assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Traumzeit-APK
+          path: app/build/outputs/apk/debug/*.apk
+
